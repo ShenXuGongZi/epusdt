@@ -21,12 +21,14 @@ var (
 )
 
 func Init() {
+	// Read from .env file if it exists (optional for Railway/Docker deployments)
 	viper.AddConfigPath("./")
 	viper.SetConfigFile(".env")
-	err := viper.ReadInConfig()
-	if err != nil {
-		panic(err)
-	}
+	_ = viper.ReadInConfig() // ignore error if .env file not found
+
+	// Also read from environment variables (Railway passes config as env vars)
+	viper.AutomaticEnv()
+
 	gwd, err := os.Getwd()
 	if err != nil {
 		panic(err)
@@ -41,14 +43,19 @@ func Init() {
 		"%s%s",
 		RuntimePath,
 		viper.GetString("log_save_path"))
-	MysqlDns = fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+	// Build MySQL DSN; append tls=true if connecting to a remote host (e.g. PlanetScale)
+	mysqlHost := viper.GetString("mysql_host")
+	mysqlAddr := fmt.Sprintf("%s:%s", mysqlHost, viper.GetString("mysql_port"))
+	tlsParam := ""
+	if mysqlHost != "127.0.0.1" && mysqlHost != "localhost" {
+		tlsParam = "&tls=true"
+	}
+	MysqlDns = fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local%s",
 		url.QueryEscape(viper.GetString("mysql_user")),
 		url.QueryEscape(viper.GetString("mysql_passwd")),
-		fmt.Sprintf(
-			"%s:%s",
-			viper.GetString("mysql_host"),
-			viper.GetString("mysql_port")),
-		viper.GetString("mysql_database"))
+		mysqlAddr,
+		viper.GetString("mysql_database"),
+		tlsParam)
 	TgBotToken = viper.GetString("tg_bot_token")
 	TgProxy = viper.GetString("tg_proxy")
 	TgManage = viper.GetInt64("tg_manage")

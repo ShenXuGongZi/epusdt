@@ -19,5 +19,6 @@ WORKDIR /app
 COPY --from=builder /app/static /app/static
 COPY --from=builder /app/static /static
 COPY --from=builder /app/epusdt .
+RUN mkdir -p /app/runtime/logs /app/conf
 
 ENTRYPOINT ["./epusdt" ,"http","start"]
