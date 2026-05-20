@@ -14,20 +14,31 @@ import (
 var Rdb *redis.Client
 
 func RedisInit() error {
-	options := redis.Options{
-		Addr: fmt.Sprintf(
-			"%s:%s",
-			viper.GetString("redis_host"),
-			viper.GetString("redis_port")), // Redis地址
-		DB:          viper.GetInt("redis_db"),                                        // Redis库
-		PoolSize:    viper.GetInt("redis_pool_size"),                                 // Redis连接池大小
-		MaxRetries:  viper.GetInt("redis_max_retries"),                               // 最大重试次数
-		IdleTimeout: time.Second * time.Duration(viper.GetInt("redis_idle_timeout")), // 空闲链接超时时间
+	// If redis_url is set (e.g. rediss://default:PASS@HOST:PORT for Upstash),
+	// parse it directly — handles user/password/TLS/db automatically.
+	if redisURL := viper.GetString("redis_url"); redisURL != "" {
+		opts, err := redis.ParseURL(redisURL)
+		if err != nil {
+			color.Red.Printf("[store_redis] redis_url parse failed: %s", err)
+			return err
+		}
+		Rdb = redis.NewClient(opts)
+	} else {
+		options := redis.Options{
+			Addr: fmt.Sprintf(
+				"%s:%s",
+				viper.GetString("redis_host"),
+				viper.GetString("redis_port")), // Redis地址
+			DB:          viper.GetInt("redis_db"),                                        // Redis库
+			PoolSize:    viper.GetInt("redis_pool_size"),                                 // Redis连接池大小
+			MaxRetries:  viper.GetInt("redis_max_retries"),                               // 最大重试次数
+			IdleTimeout: time.Second * time.Duration(viper.GetInt("redis_idle_timeout")), // 空闲链接超时时间
+		}
+		if viper.GetString("redis_passwd") != "" {
+			options.Password = viper.GetString("redis_passwd")
+		}
+		Rdb = redis.NewClient(&options)
 	}
-	if viper.GetString("redis_passwd") != "" {
-		options.Password = viper.GetString("redis_passwd")
-	}
-	Rdb = redis.NewClient(&options)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	pong, err := Rdb.Ping(ctx).Result()
@@ -35,9 +46,6 @@ func RedisInit() error {
 		log.Sugar.Debug("[store_redis] Nil reply returned by Rdb when key does not exist.")
 	} else if err != nil {
 		color.Red.Printf("[store_redis] redis connRdb err,err=%s", err)
-		// panic(err)
-		// time.Sleep(10 * time.Second)
-		// RedisInit()
 		return err
 	} else {
 		log.Sugar.Debug("[store_redis] redis connRdb success,suc=%s", pong)

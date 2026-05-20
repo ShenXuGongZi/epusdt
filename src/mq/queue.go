@@ -1,7 +1,11 @@
 package mq
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
 
 	"github.com/assimon/luuu/mq/handle"
 	"github.com/assimon/luuu/util/log"
@@ -11,8 +15,36 @@ import (
 
 var MClient *asynq.Client
 
-func Start() {
-	redis := asynq.RedisClientOpt{
+func buildRedisOpt() asynq.RedisClientOpt {
+	// If redis_url is set (e.g. rediss://default:PASS@HOST:PORT for Upstash),
+	// parse it to extract host/password/db/TLS.
+	if rawURL := viper.GetString("redis_url"); rawURL != "" {
+		u, err := url.Parse(rawURL)
+		if err == nil {
+			opt := asynq.RedisClientOpt{
+				Addr: u.Host,
+			}
+			if pwd, ok := u.User.Password(); ok {
+				opt.Password = pwd
+			}
+			if u.User.Username() != "" {
+				opt.Username = u.User.Username()
+			}
+			// DB from path (e.g., /5)
+			if len(u.Path) > 1 {
+				if db, err := strconv.Atoi(strings.TrimPrefix(u.Path, "/")); err == nil {
+					opt.DB = db
+				}
+			}
+			// Enable TLS for rediss:// scheme
+			if u.Scheme == "rediss" {
+				opt.TLSConfig = &tls.Config{ServerName: u.Hostname()}
+			}
+			return opt
+		}
+		log.Sugar.Errorf("[queue] redis_url parse failed: %v, falling back to host/port", err)
+	}
+	return asynq.RedisClientOpt{
 		Addr: fmt.Sprintf(
 			"%s:%s",
 			viper.GetString("redis_host"),
@@ -20,8 +52,12 @@ func Start() {
 		DB:       viper.GetInt("redis_db"),
 		Password: viper.GetString("redis_passwd"),
 	}
-	initClient(redis)
-	go initListen(redis)
+}
+
+func Start() {
+	redisOpt := buildRedisOpt()
+	initClient(redisOpt)
+	go initListen(redisOpt)
 }
 
 func initClient(redis asynq.RedisClientOpt) {

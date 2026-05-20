@@ -33,7 +33,7 @@ func Init() {
 		"static_path", "runtime_root_path", "log_save_path", "log_max_size", "log_max_age", "max_backups",
 		"mysql_host", "mysql_port", "mysql_user", "mysql_passwd", "mysql_database",
 		"mysql_table_prefix", "mysql_max_idle_conns", "mysql_max_open_conns", "mysql_max_life_time",
-		"redis_host", "redis_port", "redis_passwd", "redis_db", "redis_pool_size", "redis_max_retries", "redis_idle_timeout",
+		"redis_host", "redis_port", "redis_passwd", "redis_db", "redis_pool_size", "redis_max_retries", "redis_idle_timeout", "redis_url",
 		"queue_concurrency", "queue_level_critical", "queue_level_default", "queue_level_low",
 		"tg_bot_token", "tg_proxy", "tg_manage",
 		"api_auth_token", "order_expiration_time", "forced_usdt_rate",
